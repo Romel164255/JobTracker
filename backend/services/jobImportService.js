@@ -1,57 +1,93 @@
-// backend/services/jobImportService.js
-// CHANGED: replaced sampleJobs.js with real scraper (../scrapers/index.js)
-// Everything else stays the same — scraper returns same { company, jobText } format.
-
 const analyzeJob = require("./jobService");
-const scrapeAllJobs = require("../scrapers/index");   // <-- THIS IS THE ONLY CHANGE
+const scrapeAllJobs = require("../scrapers/index");
+const logger = require("../utils/logger");
 
 async function importJobs() {
   try {
-    let found = 0;
+    const TARGET_SUITABLE = 10;
+    let suitableFound = 0;
     let processed = 0;
+    let storedCount = 0;
+    let skippedInDbCount = 0;
+    let applyCount = 0;
+    let skipCount = 0;
 
-    console.log("Starting job import...");
+    logger.info("Import started");
+    logger.info("Scraping jobs from Naukri, Wellfound, LinkedIn");
 
-    // Scrape live jobs from Naukri, Wellfound, LinkedIn
     const jobs = await scrapeAllJobs();
+    const totalFound = jobs.length;
+
+    logger.info(`Total jobs scraped: ${totalFound}`);
 
     if (jobs.length === 0) {
-      console.log("No jobs scraped. Check scraper logs above.");
-      return;
+      logger.warn("No jobs scraped. Check scraper logs above.");
+      logger.success("Task complete");
+      return {
+        totalScraped: 0,
+        processed: 0,
+        applyCount: 0,
+        skipCount: 0,
+        storedCount: 0,
+        dbSkippedCount: 0,
+        suitableFound: 0
+      };
     }
 
     for (const job of jobs) {
       processed++;
-      console.log(`\nChecking job ${processed} of ${jobs.length}`);
+      logger.info(`Checking job ${processed}/${jobs.length}`);
 
-      // Stop after finding 10 suitable jobs
-      if (found >= 10) {
-        console.log("\nTarget reached");
-        console.log(`Found ${found} suitable jobs`);
+      if (suitableFound >= TARGET_SUITABLE) {
+        logger.info(`Target reached: ${suitableFound}/${TARGET_SUITABLE} suitable jobs`);
         break;
       }
 
       const result = await analyzeJob(job.jobText);
-
-      console.log("Company:", result.jobInfo.company || job.company || "Unknown");
-      console.log("Role:", result.jobInfo.role || "Unknown");
-      console.log("Score:", result.score);
-      console.log("Decision:", result.summary.decision);
-      console.log("Reason:", result.reason);
-      console.log("Source:", job.source || "unknown");
+      const company = result.jobInfo.company || job.company || "Unknown";
+      const role = result.jobInfo.role || "Unknown";
+      const source = job.source || "unknown";
+      const decision = result.summary.decision;
+      const dbStatus = result.storage?.status || "unknown";
 
       if (result.apply) {
-        found++;
-        console.log(`Suitable jobs found: ${found}/10`);
+        suitableFound++;
+        applyCount++;
+      } else {
+        skipCount++;
       }
+
+      if (dbStatus === "stored") {
+        storedCount++;
+      } else if (dbStatus === "duplicate") {
+        skippedInDbCount++;
+      }
+
+      logger.info(
+        `Job result -> ${company} | ${role} | source=${source} | score=${result.score} | decision=${decision} | db=${dbStatus}`
+      );
+      logger.info(`Reason -> ${result.reason}`);
+      logger.info(`Suitable jobs progress -> ${suitableFound}/${TARGET_SUITABLE}`);
     }
 
-    console.log("\nImport complete");
-    console.log(`Jobs processed: ${processed}`);
-    console.log(`Suitable jobs found: ${found}`);
+    logger.success("Task complete");
+    logger.info(`Summary: scraped=${totalFound}, processed=${processed}`);
+    logger.info(`Summary: apply=${applyCount}, skip=${skipCount}`);
+    logger.info(`Summary: dbStored=${storedCount}, dbSkipped=${skippedInDbCount}`);
+    logger.info(`Summary: suitableFound=${suitableFound}`);
+
+    return {
+      totalScraped: totalFound,
+      processed,
+      applyCount,
+      skipCount,
+      storedCount,
+      dbSkippedCount: skippedInDbCount,
+      suitableFound
+    };
   } catch (error) {
-    console.log("Import error:");
-    console.log(error);
+    logger.error("Import error", error);
+    throw error;
   }
 }
 

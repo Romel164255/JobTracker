@@ -1,50 +1,25 @@
-const express =
-require("express");
+const express = require("express");
+const importJobs = require("../services/jobImportService");
+const logger = require("../utils/logger");
 
-const router =
-express.Router();
+const router = express.Router();
 
-const importJobs =
-require("../services/jobImportService");
+router.post("/", async (req, res) => {
+  try {
+    logger.info("Import API called: POST /api/import");
+    const summary = await importJobs();
 
+    res.json({
+      message: "Import task complete",
+      summary
+    });
+  } catch (error) {
+    logger.error("Import failed", error);
 
-router.post(
-
-"/",
-
-async(req,res)=>{
-
-try{
-
-await importJobs();
-
-res.json({
-
-message:
-"Jobs imported"
-
+    res.status(500).json({
+      message: "Import failed"
+    });
+  }
 });
 
-}
-catch(error){
-
-console.log(
-error
-);
-
-res.status(500)
-.json({
-
-message:
-"Import failed"
-
-});
-
-}
-
-}
-
-);
-
-module.exports =
-router;
+module.exports = router;

@@ -1,149 +1,51 @@
-const profile =
-require("../utils/profile");
+const profile = require("../utils/profile");
+const matchJob = require("../parsers/matcher");
+const extractExperience = require("../parsers/experienceParser");
+const detectFlags = require("../parsers/jobFlags");
+const createSummary = require("../parsers/jobSummary");
+const extractJobInfo = require("../parsers/jobInfoParser");
+const saveJob = require("./jobStorageService");
+const analyzeJobAI = require("./geminiService");
 
-const matchJob =
-require("../parsers/matcher");
+async function analyzeJob(jobText) {
+  const result = matchJob(jobText, profile);
 
-const extractExperience =
-require("../parsers/experienceParser");
+  const aiResult = await analyzeJobAI(jobText);
+  result.ai = aiResult;
 
-const detectFlags =
-require("../parsers/jobFlags");
+  const experience = extractExperience(jobText);
+  const flags = detectFlags(jobText);
+  const jobInfo = extractJobInfo(jobText);
 
-const createSummary =
-require("../parsers/jobSummary");
+  result.flags = flags;
+  result.experience = experience;
+  result.jobInfo = jobInfo;
 
-const extractJobInfo =
-require("../parsers/jobInfoParser");
+  result.apply = false;
+  result.reason = "Low match score";
 
-const saveJob =
-require("./jobStorageService");
+  if (experience && experience.minYears > 2) {
+    result.reason = "Experience requirement too high";
+  }
 
-const analyzeJobAI =
-require("./geminiService");
+  if (flags.length > 0) {
+    result.reason = flags.join(", ");
+  }
 
+  const canApply =
+    result.score >= 50 &&
+    flags.length === 0 &&
+    (!experience || experience.minYears <= 2);
 
-async function analyzeJob(jobText){
+  if (canApply) {
+    result.apply = true;
+    result.reason = "Good match";
+  }
 
-    // Skill matching
-    const result =
-    matchJob(
-        jobText,
-        profile
-    );
+  result.summary = createSummary(result);
+  result.storage = await saveJob(result, jobText);
 
-
-    // AI analysis (Gemini)
-    const aiResult =
-    await analyzeJobAI(
-        jobText
-    );
-
-    result.ai =
-    aiResult;
-
-
-    // Extract metadata
-    const experience =
-    extractExperience(
-        jobText
-    );
-
-    const flags =
-    detectFlags(
-        jobText
-    );
-
-    const jobInfo =
-    extractJobInfo(
-        jobText
-    );
-
-
-    // Attach data
-    result.flags =
-    flags;
-
-    result.experience =
-    experience;
-
-    result.jobInfo =
-    jobInfo;
-
-
-    // Defaults
-    result.apply =
-    false;
-
-    result.reason =
-    "Low match score";
-
-
-    // Experience rule
-    if(
-        experience &&
-        experience.minYears > 2
-    ){
-
-        result.reason =
-        "Experience requirement too high";
-
-    }
-
-
-    // Red flags override
-    if(
-        flags.length > 0
-    ){
-
-        result.reason =
-        flags.join(", ");
-
-    }
-
-
-    // Final decision
-    const canApply =
-
-        result.score >= 50 &&
-
-        flags.length === 0 &&
-
-        (
-            !experience ||
-            experience.minYears <= 2
-        );
-
-
-    if(canApply){
-
-        result.apply =
-        true;
-
-        result.reason =
-        "Good match";
-
-    }
-
-
-    // Generate summary
-    result.summary =
-    createSummary(
-        result
-    );
-
-
-    // Save to DB
-    await saveJob(
-        result,
-        jobText
-    );
-
-
-    return result;
-
+  return result;
 }
 
-
-module.exports =
-analyzeJob;
+module.exports = analyzeJob;
