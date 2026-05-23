@@ -1,19 +1,34 @@
-const { getBrowser } =
-require("../services/browserService");
+// backend/scrapers/wellfound.js
+
+const {
+  getBrowser
+} = require(
+  "../services/browserService"
+);
 
 const WELLFOUND_SEARCHES = [
 
-"https://wellfound.com/jobs?role=full-stack-engineer&location=hyderabad-india",
+  // Hyderabad
+  "https://wellfound.com/jobs?role=full-stack-engineer&location=hyderabad-india",
 
-"https://wellfound.com/jobs?role=backend-engineer&location=hyderabad-india",
+  "https://wellfound.com/jobs?role=backend-engineer&location=hyderabad-india",
 
-"https://wellfound.com/jobs?role=software-engineer&location=hyderabad-india&remote=true",
+  "https://wellfound.com/jobs?role=software-engineer&location=hyderabad-india&remote=true",
 
-"https://wellfound.com/jobs?role=full-stack-engineer&remote=true"
+  // Bengaluru
+  "https://wellfound.com/jobs?role=backend-engineer&location=bengaluru-india",
+
+  "https://wellfound.com/jobs?role=software-engineer&location=bengaluru-india",
+
+  // Chennai
+  "https://wellfound.com/jobs?role=backend-engineer&location=chennai-india",
+
+  // Remote
+  "https://wellfound.com/jobs?role=full-stack-engineer&remote=true"
 
 ];
 
-const MAX_JOBS_PER_URL = 5;
+const MAX_JOBS_PER_URL = 3;
 
 
 async function scrapeWellfound(){
@@ -36,7 +51,7 @@ await page.route(
 
 "**/*.{png,jpg,jpeg,gif,svg,woff,woff2,ttf,mp4}",
 
-route=>route.abort()
+route => route.abort()
 
 );
 
@@ -50,7 +65,9 @@ try{
 for(const url of WELLFOUND_SEARCHES){
 
 console.log(
-`[Wellfound] ${url}`
+
+`[Wellfound] Searching: ${url}`
+
 );
 
 await page.goto(
@@ -59,8 +76,7 @@ url,
 
 {
 
-waitUntil:
-"networkidle",
+waitUntil:"networkidle",
 
 timeout:35000
 
@@ -69,8 +85,9 @@ timeout:35000
 );
 
 await page.waitForTimeout(
-2000
+2500
 );
+
 
 const jobs=
 
@@ -84,7 +101,7 @@ const cards=
 
 document.querySelectorAll(
 
-"[data-test='StartupResult'], div[class*='JobListing']"
+"[data-test='StartupResult'], div[class*='JobListing'], div[class*='job'], article, li"
 
 );
 
@@ -98,26 +115,65 @@ break;
 
 }
 
+const companySelector=
+
+"h2, [class*='company'], [class*='startup']";
+
+const titleSelector=
+
+"h3, [class*='title'], [class*='role']";
+
+
 const company=
 
-card.querySelector("h2")
-?.innerText;
+card.querySelector(
+
+companySelector
+
+)
+
+?.innerText
+
+?.trim();
+
 
 const title=
 
-card.querySelector("h3")
-?.innerText;
+card.querySelector(
+
+titleSelector
+
+)
+
+?.innerText
+
+?.trim();
+
 
 const link=
 
-card.querySelector("a")
+card.querySelector(
+"a"
+)
+
 ?.href;
+
 
 const description=
 
-card.innerText;
+card.innerText
 
-if(company && title){
+?.trim()
+
+|| "";
+
+
+if(
+
+company &&
+title
+
+){
 
 results.push({
 
@@ -148,12 +204,37 @@ for(const job of jobs){
 const key=
 
 `${job.title}-${job.company}`
-.toLowerCase();
 
-if(seenKeys.has(key))
+.toLowerCase()
+
+.trim();
+
+if(
+seenKeys.has(key)
+)
+
 continue;
 
-seenKeys.add(key);
+seenKeys.add(
+key
+);
+
+const jobText=[
+
+`Company:${job.company}`,
+
+`Role:${job.title}`,
+
+`Description:${job.description}`,
+
+`Source:Wellfound`
+
+]
+
+.filter(Boolean)
+
+.join("\n");
+
 
 allJobs.push({
 
@@ -163,19 +244,7 @@ job.company,
 jobUrl:
 job.link,
 
-jobText:
-
-`
-Company:${job.company}
-
-Role:${job.title}
-
-Description:
-
-${job.description}
-
-Source:Wellfound
-`,
+jobText,
 
 source:
 "wellfound"
@@ -185,7 +254,7 @@ source:
 }
 
 await page.waitForTimeout(
-3000
+2500
 );
 
 }
@@ -194,7 +263,9 @@ await page.waitForTimeout(
 catch(error){
 
 console.log(
-error.message
+
+`[Wellfound] ${error.message}`
+
 );
 
 }
@@ -203,7 +274,7 @@ await context.close();
 
 console.log(
 
-`[Wellfound] Scraped ${allJobs.length}`
+`[Wellfound] Scraped ${allJobs.length} jobs`
 
 );
 

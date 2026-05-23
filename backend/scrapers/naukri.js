@@ -1,6 +1,6 @@
 // backend/scrapers/naukri.js
-// Scrapes Naukri.com for junior developer jobs in Hyderabad
-// Uses shared browser service
+// Scrapes Naukri.com for junior developer jobs
+// Updated selectors only; architecture unchanged
 
 const { getBrowser } =
 require("../services/browserService");
@@ -8,384 +8,395 @@ require("../services/browserService");
 const SEARCH_QUERIES = [
 
   // Hyderabad
-  { keyword: "node js developer", location: "hyderabad" },
-  { keyword: "react developer fresher", location: "hyderabad" },
-  { keyword: "full stack developer junior", location: "hyderabad" },
-  { keyword: "backend developer javascript", location: "hyderabad" },
+  { keyword:"node js developer", location:"hyderabad" },
+  { keyword:"react developer fresher", location:"hyderabad" },
+  { keyword:"full stack developer junior", location:"hyderabad" },
+  { keyword:"backend developer javascript", location:"hyderabad" },
 
   // Bengaluru
-  { keyword: "node js developer", location: "bengaluru" },
-  { keyword: "react developer fresher", location: "bengaluru" },
-  { keyword: "full stack developer junior", location: "bengaluru" },
-  { keyword: "backend developer javascript", location: "bengaluru" },
+  { keyword:"node js developer", location:"bengaluru" },
+  { keyword:"react developer fresher", location:"bengaluru" },
+  { keyword:"full stack developer junior", location:"bengaluru" },
+  { keyword:"backend developer javascript", location:"bengaluru" },
 
   // Chennai
-  { keyword: "node js developer", location: "chennai" },
-  { keyword: "react developer fresher", location: "chennai" },
-  { keyword: "full stack developer junior", location: "chennai" },
-  { keyword: "backend developer javascript", location: "chennai" },
+  { keyword:"node js developer", location:"chennai" },
+  { keyword:"react developer fresher", location:"chennai" },
+  { keyword:"full stack developer junior", location:"chennai" },
+  { keyword:"backend developer javascript", location:"chennai" },
 
-  // India Remote
-  { keyword: "node js developer", location: "india" },
-  { keyword: "full stack developer remote", location: "india" }
+  // Remote India
+  { keyword:"node js developer", location:"india" },
+  { keyword:"full stack developer remote", location:"india" }
 
 ];
 
-const MAX_JOBS_PER_QUERY = 5;
+const MAX_JOBS_PER_QUERY = 3;
 
-function buildNaukriURL(keyword, location) {
 
-  const k =
-  encodeURIComponent(keyword);
+function buildNaukriURL(
+keyword,
+location
+){
 
-  const l =
-  encodeURIComponent(location);
+const k=
+encodeURIComponent(
+keyword
+);
 
-  return `https://www.naukri.com/${
-    encodeURIComponent(
-      keyword.replace(/\s+/g,"-")
-    )
-  }-jobs-in-${location}?k=${k}&l=${l}&experience=0`;
+const l=
+encodeURIComponent(
+location
+);
+
+return `https://www.naukri.com/${
+keyword.replace(/\s+/g,"-")
+}-jobs-in-${location}?k=${k}&l=${l}&experience=0`;
 
 }
 
 
-async function scrapeNaukri() {
+async function scrapeNaukri(){
 
-  // CHANGED
-  const browser =
-  await getBrowser();
+const browser=
+await getBrowser();
 
-  const context =
-  await browser.newContext({
+const context=
+await browser.newContext({
 
-    userAgent:
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+userAgent:
+"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
 
-    viewport: {
-      width:1280,
-      height:800
-    }
+viewport:{
 
-  });
+width:1280,
+height:800
 
-  const page =
-  await context.newPage();
+}
 
-  // Block images/fonts
-  await page.route(
+});
 
-    "**/*.{png,jpg,jpeg,gif,svg,woff,woff2,ttf}",
+const page=
+await context.newPage();
 
-    route=>route.abort()
+await page.route(
 
-  );
+"**/*.{png,jpg,jpeg,gif,svg,woff,woff2,ttf}",
 
-  const allJobs=[];
+route=>route.abort()
 
-  const seenTitles=
-  new Set();
+);
 
+const allJobs=[];
 
-  for(const query of SEARCH_QUERIES){
+const seenTitles=
+new Set();
 
-    try{
+for(const query of SEARCH_QUERIES){
 
-      console.log(
-        `[Naukri] Searching: ${query.keyword}`
-      );
+try{
 
-      const url=
+console.log(
 
-      buildNaukriURL(
+`[Naukri] Searching: ${query.keyword}`
 
-        query.keyword,
-        query.location
+);
 
-      );
+const url=
 
-      await page.goto(
+buildNaukriURL(
 
-        url,
+query.keyword,
+query.location
 
-        {
-          waitUntil:"domcontentloaded",
-          timeout:30000
-        }
+);
 
-      );
+await page.goto(
 
+url,
 
-      await page
+{
 
-      .waitForSelector(
+waitUntil:"domcontentloaded",
+timeout:30000
 
-        ".srp-jobtuple-wrapper, article.jobTuple",
+}
 
-        {
-          timeout:10000
-        }
+);
 
-      )
+await page.waitForTimeout(
+2500
+);
 
-      .catch(()=>null);
 
+// FIXED SELECTORS
 
-      await page.waitForTimeout(
-        2000
-      );
+const jobs=
 
+await page.evaluate(
 
-      const jobs=
+(maxJobs)=>{
 
-      await page.evaluate(
+const results=[];
 
-        (maxJobs)=>{
+const cards=
 
-          const results=[];
+document.querySelectorAll(
 
-          const cards=
+`
+.srp-jobtuple-wrapper,
+article.jobTuple,
+div[class*='cust-job-tuple'],
+div[class*='jobTuple']
+`
 
-          document.querySelectorAll(
+);
 
-            ".srp-jobtuple-wrapper, article.jobTuple"
+let count=0;
 
-          );
+for(const card of cards){
 
-          let count=0;
+if(count>=maxJobs){
 
-          for(const card of cards){
+break;
 
-            if(count>=maxJobs){
+}
 
-              break;
+const titleEl=
 
-            }
+card.querySelector(".title") ||
 
-            const titleEl=
+card.querySelector("a.title") ||
 
-            card.querySelector(".title") ||
+card.querySelector("[class*='title']") ||
 
-            card.querySelector("a.title") ||
+card.querySelector("h2") ||
 
-            card.querySelector("[class*='title']");
+card.querySelector("a");
 
 
-            const companyEl=
+const companyEl=
 
-            card.querySelector(".comp-name") ||
+card.querySelector(".comp-name") ||
 
-            card.querySelector(".subTitle") ||
+card.querySelector(".subTitle") ||
 
-            card.querySelector("[class*='company']");
+card.querySelector("[class*='company']");
 
 
-            const locationEl=
+const locationEl=
 
-            card.querySelector(".locWdth") ||
+card.querySelector(".locWdth") ||
 
-            card.querySelector(".location");
+card.querySelector(".location");
 
 
-            const expEl=
+const expEl=
 
-            card.querySelector(".expwdth") ||
+card.querySelector(".expwdth") ||
 
-            card.querySelector(".experience");
+card.querySelector(".experience");
 
 
-            const skillsEl=
+const skillsEl=
 
-            card.querySelector(".tags-gt") ||
+card.querySelector(".tags-gt") ||
 
-            card.querySelector(".skills");
+card.querySelector(".skills");
 
 
-            const descEl=
+const descEl=
 
-            card.querySelector(".job-desc") ||
+card.querySelector(".job-desc") ||
 
-            card.querySelector(".job-description");
+card.querySelector(".job-description");
 
 
-            const linkEl=
+const linkEl=
 
-            card.querySelector(
+card.querySelector(
 
-              "a.title, a[title]"
-            );
+"a.title,a[title],a"
 
+);
 
-            const jobLink=
 
-            linkEl
-            ? linkEl.href
-            : null;
+const title=
 
+titleEl?.innerText?.trim();
 
-            const title=
+const company=
 
-            titleEl
-            ? titleEl.innerText.trim()
-            : null;
+companyEl?.innerText?.trim();
 
+const location=
 
-            const company=
+locationEl?.innerText?.trim()
 
-            companyEl
-            ? companyEl.innerText.trim()
-            : null;
+|| "India";
 
 
-            const location=
+const experience=
 
-            locationEl
-            ? locationEl.innerText.trim()
-            : "Hyderabad";
+expEl?.innerText?.trim()
 
+|| "0-2 years";
 
-            const experience=
 
-            expEl
-            ? expEl.innerText.trim()
-            : "0-1 years";
+const skills=
 
+skillsEl?.innerText?.trim()
 
-            const skills=
+|| "";
 
-            skillsEl
-            ? skillsEl.innerText.trim()
-            : "";
 
+const description=
 
-            const description=
+descEl?.innerText?.trim()
 
-            descEl
-            ? descEl.innerText.trim()
-            : "";
+|| "";
 
 
-            if(title && company){
+const jobLink=
 
-              results.push({
+linkEl?.href || null;
 
-                title,
-                company,
-                location,
-                experience,
-                skills,
-                description,
-                jobLink
 
-              });
+if(
 
-              count++;
+title &&
+company
 
-            }
+){
 
-          }
+results.push({
 
-          return results;
+title,
+company,
+location,
+experience,
+skills,
+description,
+jobLink
 
-        },
+});
 
-        MAX_JOBS_PER_QUERY
+count++;
 
-      );
+}
 
+}
 
-      for(const job of jobs){
+return results;
 
-        const key=
+},
 
-        `${job.title}-${job.company}`
+MAX_JOBS_PER_QUERY
 
-        .toLowerCase();
+);
 
-        if(seenTitles.has(key))
-        continue;
 
-        seenTitles.add(key);
+for(const job of jobs){
 
-        const workMode=
+const key=
 
-        job.location
-        .toLowerCase()
-        .includes("remote")
+`${job.title}-${job.company}`
 
-        ? "remote"
-        : "on-site";
+.toLowerCase();
 
+if(
+seenTitles.has(key)
+)
 
-        const jobText=[
+continue;
 
-          `Company:${job.company}`,
+seenTitles.add(
+key
+);
 
-          `Role:${job.title}`,
+const workMode=
 
-          `Location:${job.location}`,
+job.location
+.toLowerCase()
+.includes("remote")
 
-          `Work Mode:${workMode}`,
+?
 
-          `Experience:${job.experience}`,
+"remote"
 
-          `Skills Required:${job.skills}`,
+:
 
-          `Description:${job.description}`,
+"on-site";
 
-          `Source:Naukri`
 
-        ]
+const jobText=[
 
-        .filter(Boolean)
+`Company:${job.company}`,
 
-        .join("\n");
+`Role:${job.title}`,
 
+`Location:${job.location}`,
 
-        allJobs.push({
+`Work Mode:${workMode}`,
 
-          company:
-          job.company,
+`Experience:${job.experience}`,
 
-          jobUrl:
-          job.jobLink,
+`Skills Required:${job.skills}`,
 
-          jobText,
+`Description:${job.description}`,
 
-          source:
-          "naukri"
+`Source:Naukri`
 
-        });
+]
 
-      }
+.filter(Boolean)
 
-      await page.waitForTimeout(
-        3000
-      );
+.join("\n");
 
-    }
-    catch(err){
 
-      console.error(
+allJobs.push({
 
-        `[Naukri] Error on "${query.keyword}"`,
+company:
+job.company,
 
-        err.message
+jobUrl:
+job.jobLink,
 
-      );
+jobText,
 
-    }
+source:
+"naukri"
 
-  }
+});
 
-  // CHANGED
-  await context.close();
+}
 
-  console.log(
-    `[Naukri] Scraped ${allJobs.length} jobs`
-  );
+await page.waitForTimeout(
+2500
+);
 
-  return allJobs;
+}
+catch(err){
+
+console.log(
+
+`[Naukri] ${err.message}`
+
+);
+
+}
+
+}
+
+await context.close();
+
+console.log(
+
+`[Naukri] Scraped ${allJobs.length}`
+
+);
+
+return allJobs;
 
 }
 
