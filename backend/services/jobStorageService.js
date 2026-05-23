@@ -72,47 +72,35 @@ matched_skills,
 missing_skills,
 flags,
 job_hash,
+job_url,
 raw_text
 
 )
 
 VALUES(
 
-$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12
+$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13
 
 )
 
-ON CONFLICT(job_hash)
+ON CONFLICT(job_url)
 
 DO NOTHING
 `,
-
 [
-
 company,
-
 role,
-
 location,
-
 workMode,
-
 result.score,
-
 result.summary.decision,
-
 result.reason,
-
 result.matched,
-
 result.missing,
-
 result.flags,
-
 hash,
-
+result.jobInfo.url,
 jobText
-
 ]
 
 );
