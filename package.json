@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@google/genai": "^2.6.0",
+    "bottleneck": "^2.19.5"
+  }
+}
